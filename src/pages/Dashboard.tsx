@@ -30,6 +30,10 @@ const Dashboard: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState('All Units');
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
   const [ingestData, setIngestData] = useState({ subject: '', body: '' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResponse, setSearchResponse] = useState<any>(null);
+  const [actionExecuting, setActionExecuting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -73,6 +77,30 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const handleSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const result = await authService.queryEmails(searchQuery);
+      setSearchResponse(result);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleExecuteAction = async () => {
+    if (!selectedEmail) return;
+    setActionExecuting(true);
+    // Mocking API delay for visual feedback
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    alert(`NEURAL ACTION EXECUTED: ${selectedEmail.action || 'Default Policy Applied'}`);
+    setActionExecuting(false);
+  };
+
   const getEmailId = (email: any) => {
     if (!email || !email.id) return Math.random().toString();
     if (typeof email.id === 'string') return email.id;
@@ -101,13 +129,38 @@ const Dashboard: React.FC = () => {
               </div>
               <div className="ops-card bg-[#070a1a] flex items-center justify-center gap-8">
                  <div className="neural-load-ring">
-                    <span className="text-xl">98%</span>
+                    <span className="text-xl">
+                      {emails.length > 0 ? Math.min(99.9, 85 + (emails.length * 0.5)).toFixed(1) : '0'}%
+                    </span>
                  </div>
                  <div>
-                    <h4 className="font-bold text-white">Engine Accuracy</h4>
-                    <p className="text-xs text-slate-500">Multimodal verification active</p>
+                    <h4 className="font-bold text-white">Categorization Density</h4>
+                    <p className="text-xs text-slate-500">{emails.length} Records Analyzed</p>
                  </div>
               </div>
+            </div>
+            
+            <div className="intelligence-grid">
+               {['Urgent', 'Finance', 'HR', 'Work', 'Personal'].map(cat => {
+                 const count = emails.filter(e => e.category === cat).length;
+                 const percent = emails.length > 0 ? (count / emails.length) * 100 : 0;
+                 return (
+                   <div key={cat} className="ops-card">
+                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-2">{cat}</p>
+                      <div className="flex items-end justify-between">
+                        <h3 className="text-2xl font-black text-white">{count}</h3>
+                        <p className="text-[10px] text-indigo-400 font-bold">{percent.toFixed(0)}% Cluster Share</p>
+                      </div>
+                      <div className="w-full bg-slate-900 h-1 mt-3 rounded-full overflow-hidden">
+                        <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: `${percent}%` }}
+                          className={`h-full ${cat === 'Urgent' ? 'bg-rose-500' : 'bg-indigo-500'}`}
+                        />
+                      </div>
+                   </div>
+                 );
+               })}
             </div>
           </motion.div>
         );
@@ -322,7 +375,15 @@ const Dashboard: React.FC = () => {
               type="text" 
               placeholder="Search Neural Query..."
               className="w-full bg-slate-900/50 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:border-indigo-500 transition-all outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             />
+            {isSearching && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-500" />
+              </div>
+            )}
           </div>
           
           <div className="flex items-center gap-4">
@@ -364,32 +425,38 @@ const Dashboard: React.FC = () => {
          </div>
 
          <div className="ai-brief-card">
-           <p className="text-sm text-slate-200 italic leading-relaxed">
-             {selectedEmail 
-               ? `Neural Categorization: ${selectedEmail.category || 'PENDING'}. Identified intent: ${selectedEmail.subject}. Summary: ${selectedEmail.body.substring(0, 100)}...`
-               : `"I've detected a significant spike in urgent records today. Would you like me to initiate the priority reconciliation workflow?"`}
-           </p>
-           <button className="w-full btn-primary text-[11px] uppercase tracking-widest font-black mt-4">
-             {selectedEmail ? 'Execute Policy' : 'Execute Neural Action'}
-           </button>
+            <p className="text-sm text-slate-200 italic leading-relaxed">
+              {selectedEmail 
+                ? `${selectedEmail.summary}`
+                : emails.length > 0 
+                  ? `I have indexed ${emails.length} emails. ${emails.filter(e => e.category === 'Urgent').length} items require immediate attention.`
+                  : `"I've detected a significant spike in urgent records today. Would you like me to initiate the priority reconciliation workflow?"`}
+            </p>
+            <button 
+              onClick={handleExecuteAction}
+              disabled={actionExecuting || !selectedEmail}
+              className="w-full btn-primary text-[11px] uppercase tracking-widest font-black mt-4"
+            >
+              {actionExecuting ? 'Executing...' : selectedEmail ? 'Execute Policy' : 'Execute Neural Action'}
+            </button>
          </div>
 
          <div className="space-y-6">
             <div>
-              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-4">Live Observations</p>
+              <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-4">Latest Intelligence Records</p>
               <div className="space-y-4">
-                 {[
-                   { t: 'Anomaly Detected', d: 'High latency in Node-04', s: 'warning' },
-                   { t: 'Neural Sync', d: 'Backup complete (14.2TB)', s: 'success' }
-                 ].map((obs, i) => (
-                   <div key={i} className="flex gap-3">
-                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${obs.s === 'warning' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                 {emails.slice(0, 3).map((email, i) => (
+                   <div key={i} className="flex gap-3 cursor-pointer group" onClick={() => setSelectedEmail(email)}>
+                      <div className={`w-1.5 h-1.5 rounded-full mt-1.5 ${email.category === 'Urgent' ? 'bg-rose-500' : 'bg-indigo-500'}`} />
                       <div>
-                        <p className="text-xs font-bold text-white">{obs.t}</p>
-                        <p className="text-[10px] text-slate-500">{obs.d}</p>
+                        <p className="text-xs font-bold text-white group-hover:text-indigo-400 transition-colors">{email.subject}</p>
+                        <p className="text-[10px] text-slate-500">{email.category || 'Processed'}</p>
                       </div>
                    </div>
                  ))}
+                 {emails.length === 0 && (
+                   <p className="text-[10px] text-slate-600 italic">No telemetry data streaming...</p>
+                 )}
               </div>
             </div>
 
@@ -462,6 +529,93 @@ const Dashboard: React.FC = () => {
                     </button>
                  </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Semantic Search Result Modal */}
+      <AnimatePresence>
+        {searchResponse && (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-4xl max-h-[80vh] flex flex-col glass border-indigo-500/50 bg-[#070a1a] shadow-[0_0_100px_rgba(79,70,229,0.2)] overflow-hidden"
+            >
+              <div className="p-6 border-b border-indigo-500/20 flex justify-between items-center bg-gradient-to-r from-indigo-900/40 to-transparent">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center animate-pulse">
+                    <Sparkles className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-white">Neural Response Engine</h2>
+                    <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">Retriever-Augmented Generation Active</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSearchResponse(null)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-white/10 text-white transition-colors"
+                >✕</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                <div className="max-w-2xl mx-auto space-y-10">
+                  <section>
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-4">AI Generated Answer</p>
+                    <div className="text-lg text-slate-200 leading-relaxed font-medium bg-slate-900/40 p-6 rounded-2xl border border-slate-800/50">
+                      {searchResponse.response}
+                    </div>
+                  </section>
+
+                  {searchResponse.emails && searchResponse.emails.length > 0 && (
+                    <section>
+                      <p className="text-[10px] text-slate-500 font-black uppercase tracking-[0.2em] mb-4">Neural Source References ({searchResponse.emails.length})</p>
+                      <div className="space-y-4">
+                        {searchResponse.emails.map((email: any) => (
+                          <div 
+                            key={getEmailId(email)} 
+                            className="ops-card flex items-center justify-between group cursor-pointer hover:border-indigo-500/50 transition-all"
+                            onClick={() => {
+                              setSelectedEmail(email);
+                              setSearchResponse(null);
+                            }}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center border border-slate-800 group-hover:border-indigo-500/50">
+                                <Mail size={14} className="text-indigo-400" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">{email.subject}</p>
+                                <p className="text-[10px] text-slate-500">{email.category || 'Processed'}</p>
+                              </div>
+                            </div>
+                            <ChevronRight size={16} className="text-slate-700 group-hover:text-indigo-500 transition-colors" />
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              </div>
+
+              {searchResponse.metrics && (
+                <div className="p-4 bg-slate-950/50 border-t border-slate-900 flex items-center justify-center gap-8">
+                  <div className="flex items-center gap-2">
+                    <Zap size={12} className="text-amber-500" />
+                    <span className="text-[10px] font-mono text-slate-500">LATENCY: {searchResponse.metrics.totalTimeMs}ms</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Terminal size={12} className="text-indigo-500" />
+                    <span className="text-[10px] font-mono text-slate-500">TOKENS: {searchResponse.metrics.tokensUsed}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Database size={12} className="text-emerald-500" />
+                    <span className="text-[10px] font-mono text-slate-500">SOURCES: {searchResponse.emails?.length || 0}</span>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

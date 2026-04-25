@@ -22,6 +22,16 @@ export const authService = {
     }
     return response.data;
   },
+  async googleLogin(idTokenOrAccessToken: string) {
+    const response = await api.post('/auth/google', { accessToken: idTokenOrAccessToken });
+    if (response.data.token) {
+      localStorage.setItem('token', response.data.token);
+    }
+    return response.data;
+  },
+  async syncGmail(accessToken: string, limit: number = 100) {
+    return api.post('/email/sync-gmail', { accessToken, limit });
+  },
   async signup(data: any) {
     return api.post('/auth/signup', data);
   },
@@ -33,6 +43,10 @@ export const authService = {
   },
   isAuthenticated() {
     return !!localStorage.getItem('token');
+  },
+  async queryEmails(query: string, limit: number = 5) {
+    const response = await api.post('/query', { query, limit });
+    return response.data;
   }
 };
 

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Sparkles } from 'lucide-react';
 import { authService } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 
 type AuthMode = 'login' | 'signup' | 'forgot';
 
@@ -13,6 +14,27 @@ const AuthPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      setError('Initializing intelligence sync... please wait');
+      try {
+        await authService.googleLogin(tokenResponse.access_token);
+        
+        // Background sync latest 100 emails
+        authService.syncGmail(tokenResponse.access_token, 100).catch(e => console.error("Initial sync error", e));
+        
+        navigate('/dashboard');
+      } catch (err: any) {
+        setError('Gmail Intelligence Sync Failed');
+      } finally {
+        setLoading(false);
+      }
+    },
+    scope: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+    onError: () => setError('Google Authentication Failed'),
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,13 +101,31 @@ const AuthPage: React.FC = () => {
             <Sparkles className="text-white w-8 h-8" />
           </motion.div>
           <h2 className="auth-title">
-            {mode === 'login' ? 'Welcome Back' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
+            {mode === 'login' ? 'Neural Core Access' : mode === 'signup' ? 'Deploy New Node' : 'Recovery Sequence'}
           </h2>
           <p className="auth-subtitle">
-            {mode === 'login' ? 'Enter your credentials to access your smart inbox' : 
-             mode === 'signup' ? 'Join the next generation of email intelligence' : 
-             'Enter your email to receive recovery link'}
+            {mode === 'login' ? 'Authenticate to access the orchestration dashboard' : 
+             mode === 'signup' ? 'Initialize your intelligence node' : 
+             'Requesting password reset credentials'}
           </p>
+        </div>
+
+        <div className="flex flex-col items-center gap-4 mb-4">
+          <button 
+            type="button" 
+            disabled={loading}
+            className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-white text-slate-900 rounded-xl font-black hover:bg-slate-100 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] group overflow-hidden relative"
+            onClick={() => loginWithGoogle()}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/0 via-indigo-500/10 to-indigo-500/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
+            <span className="relative">Continue with Intelligence Sync</span>
+          </button>
+          
+          <div className="relative w-full py-4">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-800"></div></div>
+            <div className="relative flex justify-center text-[10px] uppercase tracking-[0.3em] font-black"><span className="bg-[#0a0f1d] px-6 text-slate-600">Secure Protocol</span></div>
+          </div>
         </div>
 
         <AnimatePresence mode="wait">
@@ -97,6 +137,20 @@ const AuthPage: React.FC = () => {
             onSubmit={handleSubmit}
             className="auth-form"
           >
+            {mode === 'login' && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-3 mb-6 rounded-lg bg-amber-500/10 border border-amber-500/20"
+              >
+                <p className="text-[10px] text-amber-500 font-bold leading-tight flex gap-2">
+                  <span>⚠</span>
+                  Standard Login: Direct Gmail intelligence is DISABLED. 
+                  Login with Google to unlock real-time neural sync.
+                </p>
+              </motion.div>
+            )}
+
             <div className="input-group">
               <Mail className="input-icon" />
               <input
@@ -141,7 +195,7 @@ const AuthPage: React.FC = () => {
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
               ) : (
                 <>
-                  {mode === 'login' ? 'Sign In' : mode === 'signup' ? 'Start Journey' : 'Send Link'}
+                  {mode === 'login' ? 'Initialize Session' : mode === 'signup' ? 'Execute Deployment' : 'Send Link'}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -153,7 +207,7 @@ const AuthPage: React.FC = () => {
           {mode === 'login' ? (
             <>
               <button type="button" onClick={() => setMode('signup')} className="auth-link">
-                Don't have an account? <span className="font-semibold">Sign Up</span>
+                Don't have an account? <span className="font-semibold text-indigo-400">Sign Up</span>
               </button>
               <button type="button" onClick={() => setMode('forgot')} className="auth-secondary-link">
                 Forgot your password?
@@ -161,7 +215,7 @@ const AuthPage: React.FC = () => {
             </>
           ) : (
             <button type="button" onClick={() => setMode('login')} className="auth-link">
-              Already have an account? <span className="font-semibold">Sign In</span>
+              Already have an account? <span className="font-semibold text-indigo-400">Sign In</span>
             </button>
           )}
         </div>
